@@ -1,6 +1,8 @@
 import { renameColumn, deleteColumn } from "@/lib/db";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function PATCH(req, props) {
   const params = await props.params;
   const { label } = await req.json();

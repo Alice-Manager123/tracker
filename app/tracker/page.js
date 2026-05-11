@@ -1,7 +1,5 @@
 import Tracker from "@/components/Tracker";
-import { setupDB } from "@/lib/db";
 
-export default async function TrackerPage() {
-  await setupDB();
+export default function TrackerPage() {
   return <Tracker />;
 }
