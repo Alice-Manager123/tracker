@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 
 const QUOTE_STATUSES = ["", "Awaiting Approval", "Approved"];
 const INVOICE_STATUSES = ["", "Awaiting Approval", "Approved"];
@@ -109,6 +109,12 @@ export default function Tracker() {
     setUploading(p => ({ ...p, [key]: false }));
   };
 
+  const openPDF = (url) => {
+    const win = window.open("", "_blank");
+    win.document.write("<html><body style='margin:0'><iframe src='" + url + "' width='100%' height='100%' style='border:none'></iframe></body></html>");
+    win.document.close();
+  };
+
   const th = { border: "0.5px solid #e5e7eb", padding: "8px 10px", fontSize: 12, fontWeight: 500, color: "#6b7280", background: "#f9fafb", textAlign: "left", whiteSpace: "nowrap" };
   const td = { border: "0.5px solid #e5e7eb", padding: 0, verticalAlign: "middle", background: "#fff", minWidth: 120 };
   const inp = { width: "100%", border: "none", outline: "none", padding: "7px 9px", fontSize: 13, background: "transparent", boxSizing: "border-box" };
@@ -207,9 +213,8 @@ export default function Tracker() {
                     return (
                       <td key={col.id} style={{ ...td, minWidth: 140 }}>
                         <div style={{ padding: "5px 8px", display: "flex", alignItems: "center", gap: 6 }}>
-                          {val
-                            ? <a href={val} onClick={(e)} => { e.preventDefault(); const w = window.open(); w.document.write('<iframe width=100% height=100% src=' + val + '></iframe>'); }} style={{ fontSize: 12, color: "#2563eb", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>View PDF</a>
-                            : <span style={{ fontSize: 12, color: "#9ca3af" }}>{isUploading ? "Uploading..." : "No file"}</span>}
+                          {val && <button onClick={() => openPDF(val)} style={{ fontSize: 12, color: "#2563eb", background: "none", border: "none", cursor: "pointer", padding: 0 }}>View PDF</button>}
+                          {!val && <span style={{ fontSize: 12, color: "#9ca3af" }}>{isUploading ? "Uploading..." : "No file"}</span>}
                           <label style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 7px", fontSize: 11, cursor: "pointer", color: "#6b7280" }}>
                             {isUploading ? "..." : val ? "Change" : "Attach"}
                             <input type="file" accept=".pdf" style={{ display: "none" }}
@@ -247,5 +252,3 @@ export default function Tracker() {
     </div>
   );
 }
-
-
