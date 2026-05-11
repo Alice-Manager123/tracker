@@ -208,7 +208,7 @@ export default function Tracker() {
                       <td key={col.id} style={{ ...td, minWidth: 140 }}>
                         <div style={{ padding: "5px 8px", display: "flex", alignItems: "center", gap: 6 }}>
                           {val
-                            ? <a href={val} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#2563eb", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>View PDF</a>
+                            ? <a href={val} onClick={(e)} => { e.preventDefault(); const w = window.open(); w.document.write('<iframe width=100% height=100% src=' + val + '></iframe>'); }} style={{ fontSize: 12, color: "#2563eb", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>View PDF</a>
                             : <span style={{ fontSize: 12, color: "#9ca3af" }}>{isUploading ? "Uploading..." : "No file"}</span>}
                           <label style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 7px", fontSize: 11, cursor: "pointer", color: "#6b7280" }}>
                             {isUploading ? "..." : val ? "Change" : "Attach"}
@@ -247,3 +247,5 @@ export default function Tracker() {
     </div>
   );
 }
+
+
