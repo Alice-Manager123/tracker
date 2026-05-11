@@ -5,32 +5,25 @@ const QUOTE_STATUSES = ["", "Awaiting Approval", "Approved"];
 const INVOICE_STATUSES = ["", "Awaiting Approval", "Approved"];
 const STATUS_STYLE = {
   "Awaiting Approval": { background: "#fef3c7", color: "#92400e" },
-  "Approved":          { background: "#d1fae5", color: "#065f46" },
-  "":                  { background: "transparent", color: "#6b7280" },
+  "Approved": { background: "#d1fae5", color: "#065f46" },
+  "": { background: "transparent", color: "#6b7280" },
 };
 
 const api = (url, opts = {}) =>
-  fetch(url, { headers: { "Content-Type": "application/json" }, ...opts })
-    .then(r => r.json());
+  fetch(url, { headers: { "Content-Type": "application/json" }, ...opts }).then(r => r.json());
 
 export default function Tracker() {
-  const [rows, setRows]           = useState([]);
-  const [cols, setCols]           = useState([]);
+  const [rows, setRows] = useState([]);
+  const [cols, setCols] = useState([]);
   const [quoteEmails, setQEmails] = useState([]);
-  const [invEmails,   setIEmails] = useState([]);
+  const [invEmails, setIEmails] = useState([]);
   const [showSettings, setSettings] = useState(false);
-  const [newCol, setNewCol]       = useState("");
-  const [newQEmail, setNQEmail]   = useState("");
-  const [newIEmail, setNIEmail]   = useState("");
-  const [editCol, setEditCol]     = useState(null);
-  const [editVal, setEditVal]     = useState("");
-  const fileRefs = useRef({});
-
-  const [highlightRow, setHighlight] = useState(null);
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("row");
-    if (id) setHighlight(Number(id));
-  }, []);
+  const [newCol, setNewCol] = useState("");
+  const [newQEmail, setNQEmail] = useState("");
+  const [newIEmail, setNIEmail] = useState("");
+  const [editCol, setEditCol] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [uploading, setUploading] = useState({});
 
   const load = async () => {
     const [r, c, qe, ie] = await Promise.all([
@@ -49,22 +42,18 @@ export default function Tracker() {
   };
 
   const deleteRow = async (id) => {
-    await api(`/api/rows/${id}`, { method: "DELETE" });
+    await api("/api/rows/" + id, { method: "DELETE" });
     setRows(p => p.filter(r => r.id !== id));
   };
 
   const updateCell = async (rowId, colKey, value, rowData) => {
     setRows(p => p.map(r => r.id === rowId ? { ...r, data: { ...r.data, [colKey]: value } } : r));
-    await api(`/api/rows/${rowId}`, { method: "PATCH", body: JSON.stringify({ colKey, value }) });
+    await api("/api/rows/" + rowId, { method: "PATCH", body: JSON.stringify({ colKey, value }) });
     if (colKey === "quoteStatus" && value === "Awaiting Approval") {
-      await api("/api/emails/send", { method: "POST", body: JSON.stringify({
-        type: "quote", rowId, poNumber: rowData["poNumber"] || ""
-      })});
+      await api("/api/emails/send", { method: "POST", body: JSON.stringify({ type: "quote", rowId, poNumber: rowData["poNumber"] || "" }) });
     }
     if (colKey === "invoiceStatus" && value === "Awaiting Approval") {
-      await api("/api/emails/send", { method: "POST", body: JSON.stringify({
-        type: "invoice", rowId, invoiceNumber: rowData["invoiceNumber"] || ""
-      })});
+      await api("/api/emails/send", { method: "POST", body: JSON.stringify({ type: "invoice", rowId, invoiceNumber: rowData["invoiceNumber"] || "" }) });
     }
   };
 
@@ -75,13 +64,13 @@ export default function Tracker() {
   };
 
   const deleteCol = async (id) => {
-    await api(`/api/columns/${id}`, { method: "DELETE" });
+    await api("/api/columns/" + id, { method: "DELETE" });
     setCols(p => p.filter(c => c.id !== id));
   };
 
   const saveColName = async () => {
     if (editVal.trim()) {
-      await api(`/api/columns/${editCol}`, { method: "PATCH", body: JSON.stringify({ label: editVal.trim() }) });
+      await api("/api/columns/" + editCol, { method: "PATCH", body: JSON.stringify({ label: editVal.trim() }) });
       setCols(p => p.map(c => c.id === editCol ? { ...c, label: editVal.trim() } : c));
     }
     setEditCol(null);
@@ -100,10 +89,24 @@ export default function Tracker() {
   };
 
   const handlePDF = async (rowId, colKey, file) => {
-    const form = new FormData(); form.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: form }).then(r => r.json());
-    setRows(p => p.map(r => r.id === rowId ? { ...r, data: { ...r.data, [colKey]: res.url } } : r));
-    await api(`/api/rows/${rowId}`, { method: "PATCH", body: JSON.stringify({ colKey, value: res.url }) });
+    if (!file) return;
+    const key = rowId + "_" + colKey;
+    setUploading(p => ({ ...p, [key]: true }));
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.url) {
+        setRows(p => p.map(r => r.id === rowId ? { ...r, data: { ...r.data, [colKey]: data.url } } : r));
+        await api("/api/rows/" + rowId, { method: "PATCH", body: JSON.stringify({ colKey, value: data.url }) });
+      } else {
+        alert("Upload failed: " + (data.error || "unknown error"));
+      }
+    } catch (e) {
+      alert("Upload error: " + e.message);
+    }
+    setUploading(p => ({ ...p, [key]: false }));
   };
 
   const th = { border: "0.5px solid #e5e7eb", padding: "8px 10px", fontSize: 12, fontWeight: 500, color: "#6b7280", background: "#f9fafb", textAlign: "left", whiteSpace: "nowrap" };
@@ -124,7 +127,7 @@ export default function Tracker() {
         {list.map(e => (
           <span key={e.id} style={{ display: "flex", alignItems: "center", gap: 4, background: "#f3f4f6", borderRadius: 20, padding: "3px 10px", fontSize: 12 }}>
             {e.email}
-            <button onClick={() => deleteEmail(e.id, setter)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>×</button>
+            <button onClick={() => deleteEmail(e.id, setter)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>x</button>
           </span>
         ))}
         {!list.length && <span style={{ fontSize: 12, color: "#9ca3af" }}>No recipients yet.</span>}
@@ -138,7 +141,7 @@ export default function Tracker() {
         <span style={{ fontWeight: 600, fontSize: 16 }}>Tracker</span>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={addRow} style={{ border: "1px solid #e5e7eb", borderRadius: 7, background: "#fff", padding: "6px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500 }}>+ Add Row</button>
-          <button onClick={() => setSettings(s => !s)} style={{ border: "1px solid #e5e7eb", borderRadius: 7, background: showSettings ? "#f3f4f6" : "#fff", padding: "6px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500 }}>⚙ Settings</button>
+          <button onClick={() => setSettings(s => !s)} style={{ border: "1px solid #e5e7eb", borderRadius: 7, background: showSettings ? "#f3f4f6" : "#fff", padding: "6px 14px", cursor: "pointer", fontSize: 13, fontWeight: 500 }}>Settings</button>
         </div>
       </div>
 
@@ -170,10 +173,10 @@ export default function Tracker() {
                         onBlur={saveColName} onKeyDown={e => e.key === "Enter" && saveColName()}
                         style={{ border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 6px", fontSize: 12, width: 100 }} />
                     ) : (
-                      <span onDoubleClick={() => { setEditCol(col.id); setEditVal(col.label); }} title="Double-click to rename">{col.label}</span>
+                      <span onDoubleClick={() => { setEditCol(col.id); setEditVal(col.label); }}>{col.label}</span>
                     )}
                     {!col.locked && (
-                      <button onClick={() => deleteCol(col.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: "0 2px" }}>×</button>
+                      <button onClick={() => deleteCol(col.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 14, padding: "0 2px" }}>x</button>
                     )}
                   </div>
                 </th>
@@ -183,7 +186,7 @@ export default function Tracker() {
           </thead>
           <tbody>
             {rows.map((row, ri) => (
-              <tr key={row.id} style={{ background: highlightRow === row.id ? "#fefce8" : ri % 2 === 0 ? "#fff" : "#fafafa" }}>
+              <tr key={row.id} style={{ background: ri % 2 === 0 ? "#fff" : "#fafafa" }}>
                 {cols.map(col => {
                   const val = row.data[col.col_key] || "";
                   const colKey = col.col_key;
@@ -193,25 +196,25 @@ export default function Tracker() {
                       <td key={col.id} style={{ ...td, minWidth: 160 }}>
                         <select value={val} onChange={e => updateCell(row.id, colKey, e.target.value, row.data)}
                           style={{ ...inp, cursor: "pointer", ...(STATUS_STYLE[val] || {}) }}>
-                          {opts.map(o => <option key={o} value={o}>{o || "— Select —"}</option>)}
+                          {opts.map(o => <option key={o} value={o}>{o || "Select"}</option>)}
                         </select>
                       </td>
                     );
                   }
                   if (col.type === "pdf") {
-                    const rk = `${row.id}_${colKey}`;
+                    const key = row.id + "_" + colKey;
+                    const isUploading = uploading[key];
                     return (
                       <td key={col.id} style={{ ...td, minWidth: 140 }}>
                         <div style={{ padding: "5px 8px", display: "flex", alignItems: "center", gap: 6 }}>
                           {val
-                            ? <a href={val} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#2563eb", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📎 View PDF</a>
-                            : <span style={{ fontSize: 12, color: "#9ca3af" }}>No file</span>}
-                          <button onClick={() => fileRefs.current[rk]?.click()}
-                            style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 7px", fontSize: 11, cursor: "pointer", color: "#6b7280" }}>
-                            {val ? "Change" : "Attach"}
-                          </button>
-                          <input type="file" accept=".pdf" ref={el => fileRefs.current[rk] = el} style={{ display: "none" }}
-                            onChange={e => e.target.files[0] && handlePDF(row.id, colKey, e.target.files[0])} />
+                            ? <a href={val} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#2563eb", maxWidth: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>View PDF</a>
+                            : <span style={{ fontSize: 12, color: "#9ca3af" }}>{isUploading ? "Uploading..." : "No file"}</span>}
+                          <label style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 4, padding: "2px 7px", fontSize: 11, cursor: "pointer", color: "#6b7280" }}>
+                            {isUploading ? "..." : val ? "Change" : "Attach"}
+                            <input type="file" accept=".pdf" style={{ display: "none" }}
+                              onChange={e => { if (e.target.files[0]) handlePDF(row.id, colKey, e.target.files[0]); }} />
+                          </label>
                         </div>
                       </td>
                     );
@@ -225,17 +228,17 @@ export default function Tracker() {
                   }
                   return (
                     <td key={col.id} style={td}>
-                      <input value={val} onChange={e => updateCell(row.id, colKey, e.target.value, row.data)} style={inp} placeholder="—" />
+                      <input value={val} onChange={e => updateCell(row.id, colKey, e.target.value, row.data)} style={inp} placeholder="" />
                     </td>
                   );
                 })}
                 <td style={{ ...td, textAlign: "center", width: 36 }}>
-                  <button onClick={() => deleteRow(row.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 16, padding: "4px 8px" }}>×</button>
+                  <button onClick={() => deleteRow(row.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: 16, padding: "4px 8px" }}>x</button>
                 </td>
               </tr>
             ))}
             {!rows.length && (
-              <tr><td colSpan={cols.length + 1} style={{ textAlign: "center", padding: 32, color: "#9ca3af", fontSize: 14 }}>No rows yet — click "+ Add Row" to get started</td></tr>
+              <tr><td colSpan={cols.length + 1} style={{ textAlign: "center", padding: 32, color: "#9ca3af", fontSize: 14 }}>No rows yet</td></tr>
             )}
           </tbody>
         </table>
