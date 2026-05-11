@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 
 const QUOTE_STATUSES = ["", "Awaiting Approval", "Approved"];
 const INVOICE_STATUSES = ["", "Awaiting Approval", "Approved"];
+const PROPERTIES = ["", "135 QP", "2727 MP", "1100 Bur", "5420 NSR"];
 const STATUS_STYLE = {
   "Awaiting Approval": { background: "#fef3c7", color: "#92400e" },
   "Approved": { background: "#d1fae5", color: "#065f46" },
@@ -49,6 +50,9 @@ export default function Tracker() {
   const updateCell = async (rowId, colKey, value, rowData) => {
     setRows(p => p.map(r => r.id === rowId ? { ...r, data: { ...r.data, [colKey]: value } } : r));
     await api("/api/rows/" + rowId, { method: "PATCH", body: JSON.stringify({ colKey, value }) });
+    if (colKey === "property" && value) {
+      await load();
+    }
     if (colKey === "quoteStatus" && value === "Awaiting Approval") {
       await api("/api/emails/send", { method: "POST", body: JSON.stringify({ type: "quote", rowId, poNumber: rowData["poNumber"] || "" }) });
     }
@@ -196,6 +200,16 @@ export default function Tracker() {
                 {cols.map(col => {
                   const val = row.data[col.col_key] || "";
                   const colKey = col.col_key;
+                  if (col.type === "property") {
+                    return (
+                      <td key={col.id} style={{ ...td, minWidth: 140 }}>
+                        <select value={val} onChange={e => updateCell(row.id, colKey, e.target.value, row.data)}
+                          style={{ ...inp, cursor: "pointer" }}>
+                          {PROPERTIES.map(p => <option key={p} value={p}>{p || "Select property"}</option>)}
+                        </select>
+                      </td>
+                    );
+                  }
                   if (col.type === "quoteStatus" || col.type === "invoiceStatus") {
                     const opts = col.type === "quoteStatus" ? QUOTE_STATUSES : INVOICE_STATUSES;
                     return (
